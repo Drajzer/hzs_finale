@@ -1,0 +1,1 @@
+Finale za takmicenje hakaton za srednjoskolce
