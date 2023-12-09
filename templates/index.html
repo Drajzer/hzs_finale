@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <select id="country">
+        <option value="Country1">Country 1</option>
+        <option value="Country2">Country 2</option>
+        <!-- Add more countries as needed -->
+    </select>
+
+    <select id="city">
+        <option value="City1">City 1</option>
+        <option value="City2">City 2</option>
+        <!-- Add more cities as needed -->
+    </select>
+
+    <button id="interest1" onclick="addInterest('Interest 1')">Interest 1</button>
+    <button id="interest2" onclick="addInterest('Interest 2')">Interest 2</button>
+    <button id="interest3" onclick="addInterest('Interest 3')">Interest 3</button>
+
+    <script>
+        let interests = [];
+        let userLocation = {};
+
+        function addInterest(interest) {
+            if (interests.length < 3) {
+                interests.push(interest);
+            }
+
+            if (interests.length === 3) {
+                userLocation = {
+                    country: document.getElementById('country').value,
+                    city: document.getElementById('city').value
+                };
+
+                fetch('/api/interests', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({interests: interests, location: userLocation}),
+                });
+
+                interests = [];
+            }
+        }
+    </script>
+</body>
+</html>
