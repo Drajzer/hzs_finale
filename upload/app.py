@@ -19,7 +19,7 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 # Set the template folder to the current directory
 app.template_folder = current_directory
 client = OpenAI(
-        api_key=""
+        api_key="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"
     )
 
 
@@ -55,6 +55,7 @@ def get_coordinates(city_name):
         longitude = location.longitude
         return latitude, longitude
     else:
+        print(f"Coordinates not found for {city_name}")
         return None
 
 
@@ -80,8 +81,10 @@ def parseContent(chat_message):
             
             return activities_list
         else:
+            print("Content not found in the message.")
             return []
     except Exception as e:
+        print(f"Error parsing message: {e}")
         return []
 
 
@@ -96,10 +99,12 @@ def get_closest_place(api_key, current_location, interest, radius=5000, types='e
 
     response = requests.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', params=params)
     data = response.json()
+
     if 'results' in data and len(data['results']) > 0:
         closest_place = min(data['results'], key=lambda x: x.get('distance', float('inf')))
         return closest_place
     else:
+        print(f'No {interest}s found.')
         return None
 
 
@@ -110,8 +115,9 @@ def handleAI(interests, location):
     Locations should exist in {location}. Also, add 2 relaxed activities.
     Only give activites not exact places. Answers should be in format activity then comma then activity then comma etc.
     Give exact answers, no more than 9. Answers should be one word per activity.
-    Names of categories on serbian latinica.
+    Imena mesta na srpskom jeziku na latinici.
     Do not include food or drinks.
+
     '''
     completion = client.chat.completions.create(
     model="gpt-3.5-turbo",
@@ -119,6 +125,7 @@ def handleAI(interests, location):
         {"role": "system", "content": prompt}
     ]
     )
+    print(completion.choices[0].message)
 
     result = parseContent(str(completion.choices[0].message))
     
@@ -129,49 +136,30 @@ def handleAI(interests, location):
 def serve_static(filename):
     return send_from_directory(os.path.join(current_directory, 'static'), filename)
 
-def exactMatch(jsonList):
-    matches =[
-            (["Relaxed", "Nature", "Group"], ['park', 'zoo', 'aquarium', 'campground', 'museum', 'restaurant', 'cafe', 'art_gallery', 'botanical_garden', 'picnic_area', 'tourist_attraction']), 
-            (["Relaxed", "Urban", "Group"], ['museum', 'art_gallery', 'shopping_mall', 'movie_theater', 'restaurant', 'cafe', 'city_hall', 'library', 'park', 'tourist_attraction', 'tourist_attraction']),
-            (['Relaxed', 'Nature', 'Solo'], ['park', 'botanical_garden', 'zoo', 'aquarium', 'museum', 'art_gallery', 'cafe', 'nature_reserve', 'hiking_trail', 'scenic_lookout', 'tourist_attraction']),
-            (['Active', 'Nature', 'Group'], ['park', 'hiking_trail', 'amusement_park', 'zoo', 'campground', 'beach', 'gym', 'bicycle_store', 'sports_complex', 'stadium', 'tourist_attraction']),
-            (['Active', 'Urban', 'Group'], ['gym', 'stadium', 'amusement_park', 'bowling_alley', 'shopping_mall', 'movie_theater', 'night_club', 'sports_bar', 'park', 'escape_room', 'tourist_attraction']),
-            (['Active', 'Nature', 'Solo'], ['park', 'hiking_trail', 'gym', 'botanical_garden', 'zoo', 'bicycle_store', 'nature_reserve', 'campground', 'rock_climbing', 'beach', 'tourist_attraction']),
-            (['Active', 'Urban', 'Solo'], ['gym', 'stadium', 'park', 'art_gallery', 'library', 'shopping_mall', 'cafe', 'museum', 'movie_theater', 'skate_park', 'tourist_attraction'])]
-
-
-    for currentMatch in matches:
-        if jsonList == currentMatch[0]:
-            return currentMatch[1]
-    
-    # if func returns empty list you should send error to user
-    return []
-
-
 @app.route('/api/interests', methods=['POST'])
 def handleInterests():
     data = request.json
-    interests = exactMatch(data['interests'])
-    if interests == []:
-      return json.dumps({'error': 'No match found'})
+    interests = data['interests'] 
+    interes = interests[0]
 
+ 
     loc = data['location']
 
     location = loc['query']
-
+    print(interests)
+    print(location)
 
     current_location = get_coordinates(location)
     langitude = current_location[0]
     longitude = current_location[1]
-    coorinates = f"{langitude},{longitude}"
-    lista=[]
-    gapikey= ""
-    for interest in interests:
-        closest_place = get_closest_place(gapikey, coorinates, interest)
-        if closest_place:
-            lista.append(closest_place["name"])
-    return json.dumps({'list':lista})
+    lista = []
+    coordinates = f'{langitude}, {longitude}'
+    print(coordinates)
+    closestPlaces = []
+    #interests = handleAI(interests, location)
+    adventure = ['party', 'avantura park,' 'luna park', 'planinarenje', 'teretana', 'kampovanje', 'trcanje', 'koncert', 'plivanje']
+    relax = ['muzej', 'biblioteka', 'bioskop','shopping','galerija','setnja','izlet','park u prirodi','spa']
 
-
+    return render_template(interes.lower() + '.html')
 if __name__ == '__main__':
     app.run(debug=True,host='0.0.0.0',port=5000)

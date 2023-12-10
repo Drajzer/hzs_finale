@@ -54,9 +54,6 @@ body {
   line-height: 20px;
   color: #333;
 }
-body {
-  -webkit-user-select: text;
-}
 img {
   max-width: 100%;
   vertical-align: middle;
