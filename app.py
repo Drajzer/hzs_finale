@@ -4,17 +4,16 @@ import os
 import requests 
 from openai import OpenAI
 from flask_cors import CORS
-import mariadb
-import bcrypt
-import jwt
 import datetime
 import re
+import ast
+from geopy.geocoders import Nominatim
 
 app = Flask(__name__, template_folder='templates',static_folder='static')
 CORS(app)  # Enable CORS for all routes
 
 client = OpenAI(
-        api_key="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"
+        api_key="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"
     )
 
 
@@ -22,30 +21,76 @@ client = OpenAI(
 def index():
     return render_template('index.html')
 
-def sortCategories(categories):
-
-    return "ok"
-def parse_categories(message_str):
-    # Extract content from the message
-    content_match = re.search(r"content='(.*?)'", message_str, re.DOTALL)
-    if content_match:
-        content = content_match.group(1)
-        # Extract categories from the content
-        categories = re.findall(r'([a-zA-Z]+):', content)
-        return categories
+def get_coordinates(city_name):
+    geolocator = Nominatim(user_agent="Firefox 89")
+    location = geolocator.geocode(city_name)
+    
+    if location:
+        latitude = location.latitude
+        longitude = location.longitude
+        return latitude, longitude
     else:
+        print(f"Coordinates not found for {city_name}")
+        return None
+
+def parse_string(input_string):
+    # Split the string at the colon
+    split_string = input_string.split(":")
+
+    # If there is something after the colon
+    if len(split_string) > 1:
+        # Return everything after the colon
+        return split_string[1].strip()
+
+    # If there is no colon in the string
+    return None
+
+def parseContent(chat_message):
+    try:
+        match = re.search(r"content='(.*?)'", chat_message)
+        if match:
+            content = match.group(1)
+            
+            activities_list = [activity.strip() for activity in content.split(',')]
+        
+
+            return activities_list
+        else:
+            print("Content not found in the message.")
+            return []
+    except Exception as e:
+        print(f"Error parsing message: {e}")
+        return []
+
+
+def get_closest_place(api_key, current_location, interest, radius=5000, types='establishment'):
+    params = {
+        'key': api_key,
+        'location': current_location,
+        'radius': radius,
+        'types': types,
+        'keyword': interest
+    }
+
+    response = requests.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', params=params)
+    data = response.json()
+
+    if 'results' in data and len(data['results']) > 0:
+        closest_place = min(data['results'], key=lambda x: x.get('distance', float('inf')))
+        return closest_place
+    else:
+        print(f'No {interest}s found.')
         return None
 
 
 def handleAI(interests, location):
-    # Set your OpenAI API key
     prompt = f'''
     You are a touristic guide. You need to suggest a variety of activities 9 activites or 9 locations that align with the person's preferences. 
     Give me categories which I can search on Google places. Activites are: {', '.join(interests)}.
-    Let's assume a persona who prefers Adventure, Nature, and Group activities. 
-    Here's how the prioritization might look (expressed as percentages, where a higher percentage indicates a higher priority for this persona). 
     Locations should exist in {location[0]}, {location[1]}. Also, add 2 relaxed activities.
-    Your response should be in format one activity per row without aditional text.
+    Only give activites not exact places. Answers should be in format activity then comma then activity then comma etc.
+    Give exact answers, no more than 9. Answers should be one word per activity.
+
     '''
     completion = client.chat.completions.create(
     model="gpt-3.5-turbo",
@@ -53,12 +98,12 @@ def handleAI(interests, location):
         {"role": "system", "content": prompt}
     ]
     )
+    print(completion.choices[0].message)
 
-    result = parse_categories(str(completion.choices[0].message))
-    print(result)
+    result = parseContent(str(completion.choices[0].message))
+    
 
-    return "ok"
-
+    return result
 @app.route('/api/interests', methods=['POST'])
 def handleInterests():
     data = request.json
@@ -69,16 +114,25 @@ def handleInterests():
 
     print(interests)
     print(location)
-    handleAI(interests,location)
 
-    return 'OK'
+    current_location = get_coordinates(location[1])
+    langitude = current_location[0]
+    longitude = current_location[1]
+    lista = []
+    coordinates = f'{langitude}, {longitude}'
+    print(coordinates)
+    closestPlaces = []
+    interests = handleAI(interests, location)
+    googleApi = "AIzaSyAwJ1Njz_3I-D1ZsqRJxalmW_1kZvSK0RQ"
+    for interest in interests:
+        closest_place = get_closest_place(googleApi, coordinates, interest)
+        
+        if closest_place:
+            tmp = parse_string(str(closest_place))
+            closestPlaces.append(tmp)
 
-
-@app.route('/location', methods=['GET'])
-def location():
-    return render_template('location.html')
-
-
+    print("LISTA:",closestPlaces)
+    return json.dumps(closestPlaces)
 
 if __name__ == '__main__':
     app.run(debug=True,host='0.0.0.0',port=5000)
